@@ -1,0 +1,31 @@
+{
+  "name": "blogi",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/mehutonkka/Fullstack4#readme",
+  "bugs": {
+    "url": "https://github.com/mehutonkka/Fullstack4/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mehutonkka/Fullstack4.git"
+  },
+  "license": "ISC",
+  "author": "Mishka Hagelberg",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "test": "node --test",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "mongoose": "^9.1.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11"
+  }
+}
