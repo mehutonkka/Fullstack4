@@ -2,11 +2,13 @@ const { test, beforeEach, after, describe } = require('node:test')
 const assert = require('node:assert')
 const mongoose = require('mongoose')
 const supertest = require('supertest')
+const bcrypt = require('bcrypt')
 
 const app = require('../app')
 const api = supertest(app)
 
 const Blog = require('../models/blog')
+const User = require('../models/user')
 
 const two_blogs = [
   {
@@ -29,8 +31,23 @@ const two_blogs = [
 
 beforeEach(async () => {
     await Blog.deleteMany({})
-    await Blog.insertMany(two_blogs)
+    await User.deleteMany({})
+
+    const pswdHash = await bcrypt.hash('password123', 10)
+
+    const user = new User({ username: 'root', name: 'root user', passwordHash: pswdHash })
+
+    const savedUser = await user.save()
+
+    const blogObjects = two_blogs.map(blog => new Blog({ ...blog, user: savedUser._id }))
+
+    const savedBlogs = await Promise.all(blogObjects.map(b => b.save()))
+
+    savedUser.blogs = savedBlogs.map(b => b._id)
+    await savedUser.save()
+
 })
+
 describe('with two initial blogs', () => {
     test('blogs are returned as json', async () => {
         await api
@@ -54,7 +71,7 @@ describe('with two initial blogs', () => {
 })
 
 describe('creating a new blog', () => {
-    test('succeeds with valid data', async () => {
+    test('succeeds with valid data and valid token', async () => {
         const newBlog = {
             _id: '5a422aa71b54a676234d17f8',
             title: 'Go To Statement Considered Harmful',
@@ -63,11 +80,20 @@ describe('creating a new blog', () => {
             likes: 5,
             __v: 0
     }
+    const loginResponse = await api
+        .post('/api/login')
+        .send({ username: 'root', password: 'password123' })
+        .expect(200)
+        .expect('Content-Type', /application\/json/)
+
+    const token = loginResponse.body.token
+
     const blogsAtStart = await api.get('/api/blogs')
     const blogsAtStartLength = blogsAtStart.body.length
 
     await api
         .post('/api/blogs')
+        .set('Authorization', `Bearer ${token}`)
         .send(newBlog)
         .expect(201)
         .expect('Content-Type', /application\/json/)
@@ -88,8 +114,18 @@ describe('creating a new blog', () => {
             url: "http://blog.cleancoder.com/uncle-bob/2016/05/01/TypeWars.html",
             __v: 0
         }
+
+        const loginResponse = await api
+            .post('/api/login')
+            .send({ username: 'root', password: 'password123' })
+            .expect(200)
+            .expect('Content-Type', /application\/json/)
+
+        const token = loginResponse.body.token
+
         const response = await api
             .post('/api/blogs')
+            .set('Authorization', `Bearer ${token}`)
             .send(newBlog)
             .expect(201)
             .expect('Content-Type', /application\/json/)
@@ -105,8 +141,16 @@ describe('creating a new blog', () => {
             url: "http://blog.cleancoder.com/uncle-bob/2016/05/01/TypeWars.html",
             __v: 0
         }
+        const loginResponse = await api
+            .post('/api/login')
+            .send({ username: 'root', password: 'password123' })
+            .expect(200)
+            .expect('Content-Type', /application\/json/)
+
+        const token = loginResponse.body.token
         await api
             .post('/api/blogs')
+            .set('Authorization', `Bearer ${token}`)
             .send(newBlog)
             .expect(400)
 
@@ -122,10 +166,38 @@ describe('creating a new blog', () => {
             author: "Robert C. Martin",
             __v: 0
         }
+        const loginResponse = await api
+            .post('/api/login')
+            .send({ username: 'root', password: 'password123' })
+            .expect(200)
+            .expect('Content-Type', /application\/json/)
+
+        const token = loginResponse.body.token
+
+        await api
+            .post('/api/blogs')
+            .set('Authorization', `Bearer ${token}`)
+            .send(newBlog)
+            .expect(400)
+
+        const blogsAtEnd = await api.get('/api/blogs')
+        assert.strictEqual(blogsAtEnd.body.length, blogsAtStart.body.length)
+    })
+
+    test('no token -> 401 Unauthorized', async () => {
+        const blogsAtStart = await api.get('/api/blogs')
+
+        const newBlog = {
+            title: "no token blog",
+            author: "Unknown",
+            url: "http://no-token-blog.com",
+            likes: 3
+        }
+
         await api
             .post('/api/blogs')
             .send(newBlog)
-            .expect(400)
+            .expect(401)
 
         const blogsAtEnd = await api.get('/api/blogs')
         assert.strictEqual(blogsAtEnd.body.length, blogsAtStart.body.length)
@@ -136,11 +208,19 @@ describe('creating a new blog', () => {
 
 describe('deletion of a blog', () => {
     test('blog can be deleted', async () => {
+        const loginResponse = await api
+            .post('/api/login')
+            .send({ username: 'root', password: 'password123' })
+            .expect(200)
+            .expect('Content-Type', /application\/json/)
+
+        const token = loginResponse.body.token
         const blogsAtStart = await api.get('/api/blogs')
         const blogToDelete = blogsAtStart.body[0]
         
         await api
             .delete(`/api/blogs/${blogToDelete.id}`)
+            .set('Authorization', `Bearer ${token}`)
             .expect(204)
         
         const blogsAtEnd = await api.get('/api/blogs')
