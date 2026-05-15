@@ -10,6 +10,12 @@ const blogsRouter = require('./controllers/blogs')
 const userRouter = require('./controllers/users')
 const loginRouter = require('./controllers/login')
 
+const testingRouter = require('./controllers/testing')
+
+if (process.env.NODE_ENV === 'test') {
+  app.use('/api/testing', testingRouter)
+}
+
 mongoose.set('strictQuery', false)
 
 mongoose
